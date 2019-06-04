@@ -1,0 +1,16 @@
+language: go
+
+sudo: false
+
+env:
+  - GO111MODULE=on
+
+go:
+  - "1.12"
+
+cache:
+  directories:
+    - $GOPATH/pkg/mod
+
+script:
+  - make test
