@@ -179,6 +179,7 @@ func resolvePkgPaths(p types.Type) ([]string, error) {
 		}
 	case *types.Basic:
 	case *types.Interface:
+	case *types.Struct: // struct{}
 		// Break out of the switch and return below
 	default:
 		return nil, fmt.Errorf("resolvePkgPaths: invalid type: %v", t)

@@ -74,9 +74,11 @@ func NewCircuitWrapperPubsub(
 }
 
 // Publish calls the embedded circuitgentest.Publisher's method Publish with CircuitPublish
-func (w *CircuitWrapperPubsub) Publish(ctx context.Context, p1 map[circuitgentest.Seed][][]circuitgentest.Grant, p2 circuitgentest.TopicsList, p3 ...rep.PublishOption) error {
+func (w *CircuitWrapperPubsub) Publish(ctx context.Context, p1 map[circuitgentest.Seed][][]circuitgentest.Grant, p2 circuitgentest.TopicsList, p3 ...rep.PublishOption) (map[string]struct{}, error) {
+	var r0 map[string]struct{}
 	err := w.CircuitPublish.Run(ctx, func(ctx context.Context) error {
-		err := w.Publisher.Publish(ctx, p1, p2, p3...)
+		var err error
+		r0, err = w.Publisher.Publish(ctx, p1, p2, p3...)
 
 		if w.IsBadRequest(err) {
 			return &circuit.SimpleBadRequest{Err: err}
@@ -88,7 +90,7 @@ func (w *CircuitWrapperPubsub) Publish(ctx context.Context, p1 map[circuitgentes
 		err = berr.Err
 	}
 
-	return err
+	return r0, err
 }
 
 // PublishWithResult calls the embedded circuitgentest.Publisher's method PublishWithResult with CircuitPublishWithResult
