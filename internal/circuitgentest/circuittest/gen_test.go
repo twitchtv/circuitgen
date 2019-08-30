@@ -19,13 +19,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/twitchtv/circuitgen/internal/circuitgentest"
-	"github.com/twitchtv/circuitgen/internal/circuitgentest/model"
-	"github.com/twitchtv/circuitgen/internal/circuitgentest/rep"
 	"github.com/cep21/circuit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/twitchtv/circuitgen/internal/circuitgentest"
+	"github.com/twitchtv/circuitgen/internal/circuitgentest/model"
+	"github.com/twitchtv/circuitgen/internal/circuitgentest/rep"
 )
 
 // Test generated clients
@@ -50,7 +50,7 @@ func TestPublisherInterface(t *testing.T) {
 
 	opt := rep.PublishOption{Sample: 0.1}
 	opt2 := rep.PublishOption{Sample: 0.2}
-	m.On("Publish", mock.Anything, grants, topics, opt, opt2).Return(nil).Once()
+	m.On("Publish", mock.Anything, grants, topics, opt, opt2).Return(nil, nil).Once()
 
 	m.On("Close", mock.Anything).Return(nil).Once()
 
@@ -87,7 +87,7 @@ func TestPublisherInterface(t *testing.T) {
 	require.Equal(t, 1*time.Second, manager.GetCircuit("Publisher.PublishWithResult").Config().Execution.Timeout)
 	require.Equal(t, 2*time.Second, manager.GetCircuit("Publisher.Publish").Config().Execution.Timeout)
 
-	err = publisher.Publish(ctx, grants, topics, opt, opt2)
+	_, err = publisher.Publish(ctx, grants, topics, opt, opt2)
 	require.NoError(t, err)
 
 	res, err := publisher.PublishWithResult(ctx, publishInput)
@@ -109,7 +109,7 @@ func TestPublisherInterfaceErrors(t *testing.T) {
 
 	testError := errors.New("test error")
 	m := &circuitgentest.MockPublisher{}
-	m.On("Publish", mock.Anything, mock.Anything, mock.Anything).Return(testError).Once()
+	m.On("Publish", mock.Anything, mock.Anything, mock.Anything).Return(nil, testError).Once()
 
 	publishCounter := &runMetricsCounter{}
 	publisher, err := NewCircuitWrapperPublisher(manager, m, CircuitWrapperPublisherConfig{
@@ -123,7 +123,7 @@ func TestPublisherInterfaceErrors(t *testing.T) {
 	require.NotNil(t, publisher)
 
 	ctx := context.Background()
-	err = publisher.Publish(ctx, map[circuitgentest.Seed][][]circuitgentest.Grant{}, circuitgentest.TopicsList{})
+	_, err = publisher.Publish(ctx, map[circuitgentest.Seed][][]circuitgentest.Grant{}, circuitgentest.TopicsList{})
 	require.Equal(t, testError, err)
 
 	// Check embedded called
@@ -138,7 +138,7 @@ func TestPublisherInterfaceBadRequest(t *testing.T) {
 
 	testError := errors.New("bad request error")
 	m := &circuitgentest.MockPublisher{}
-	m.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(testError).Once()
+	m.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, testError).Once()
 
 	publishCounter := &runMetricsCounter{}
 	publisher, err := NewCircuitWrapperPublisher(manager, m, CircuitWrapperPublisherConfig{
@@ -155,7 +155,7 @@ func TestPublisherInterfaceBadRequest(t *testing.T) {
 	require.NotNil(t, publisher)
 
 	ctx := context.Background()
-	err = publisher.Publish(ctx, map[circuitgentest.Seed][][]circuitgentest.Grant{}, circuitgentest.TopicsList{})
+	_, err = publisher.Publish(ctx, map[circuitgentest.Seed][][]circuitgentest.Grant{}, circuitgentest.TopicsList{})
 	require.Equal(t, testError, err)
 
 	// Check embedded called
@@ -171,7 +171,7 @@ func TestPubsubInterface(t *testing.T) {
 
 	m := &circuitgentest.MockPublisher{}
 	m.On("PublishWithResult", mock.Anything, mock.Anything).Return(nil, nil).Once()
-	m.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	m.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil).Once()
 	m.On("Close", mock.Anything).Return(nil).Once()
 
 	pubsub, err := NewCircuitWrapperPubsub(manager, m, CircuitWrapperPubsubConfig{})
@@ -184,7 +184,7 @@ func TestPubsubInterface(t *testing.T) {
 	require.Contains(t, names, "Pubsub.Publish")
 
 	ctx := context.Background()
-	err = pubsub.Publish(ctx, map[circuitgentest.Seed][][]circuitgentest.Grant{}, circuitgentest.TopicsList{})
+	_, err = pubsub.Publish(ctx, map[circuitgentest.Seed][][]circuitgentest.Grant{}, circuitgentest.TopicsList{})
 	require.NoError(t, err)
 
 	_, err = pubsub.PublishWithResult(ctx, rep.PublishInput{})

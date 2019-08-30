@@ -73,9 +73,11 @@ func NewCircuitWrapperPublisher(
 }
 
 // Publish calls the embedded Publisher's method Publish with CircuitPublish
-func (w *CircuitWrapperPublisher) Publish(ctx context.Context, p1 map[Seed][][]Grant, p2 TopicsList, p3 ...rep.PublishOption) error {
+func (w *CircuitWrapperPublisher) Publish(ctx context.Context, p1 map[Seed][][]Grant, p2 TopicsList, p3 ...rep.PublishOption) (map[string]struct{}, error) {
+	var r0 map[string]struct{}
 	err := w.CircuitPublish.Run(ctx, func(ctx context.Context) error {
-		err := w.Publisher.Publish(ctx, p1, p2, p3...)
+		var err error
+		r0, err = w.Publisher.Publish(ctx, p1, p2, p3...)
 
 		if w.IsBadRequest(err) {
 			return &circuit.SimpleBadRequest{Err: err}
@@ -87,7 +89,7 @@ func (w *CircuitWrapperPublisher) Publish(ctx context.Context, p1 map[Seed][][]G
 		err = berr.Err
 	}
 
-	return err
+	return r0, err
 }
 
 // PublishWithResult calls the embedded Publisher's method PublishWithResult with CircuitPublishWithResult

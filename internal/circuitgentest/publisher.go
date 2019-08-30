@@ -16,9 +16,9 @@ package circuitgentest
 import (
 	"context"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/twitchtv/circuitgen/internal/circuitgentest/model"
 	"github.com/twitchtv/circuitgen/internal/circuitgentest/rep"
-	"github.com/stretchr/testify/mock"
 )
 
 // TopicsList is a test struct
@@ -40,7 +40,7 @@ type Publisher interface {
 	// PublishWithResult is a test method and should be wrapped
 	PublishWithResult(context.Context, rep.PublishInput) (*model.Result, error)
 	// PublishWithResult is a test method and should be wrapped
-	Publish(context.Context, map[Seed][][]Grant, TopicsList, ...rep.PublishOption) error
+	Publish(context.Context, map[Seed][][]Grant, TopicsList, ...rep.PublishOption) (map[string]struct{}, error)
 	// PublishWithResult is a test method and should not be wrapped
 	Close() error
 }
@@ -65,7 +65,7 @@ func (m *MockPublisher) PublishWithResult(ctx context.Context, input rep.Publish
 }
 
 // Publish mocks the method
-func (m *MockPublisher) Publish(ctx context.Context, g map[Seed][][]Grant, s TopicsList, opts ...rep.PublishOption) error {
+func (m *MockPublisher) Publish(ctx context.Context, g map[Seed][][]Grant, s TopicsList, opts ...rep.PublishOption) (map[string]struct{}, error) {
 	var ca []interface{}
 	ca = append(ca, ctx, g, s)
 	va := make([]interface{}, len(opts))
@@ -74,7 +74,17 @@ func (m *MockPublisher) Publish(ctx context.Context, g map[Seed][][]Grant, s Top
 	}
 	ca = append(ca, va...)
 	args := m.Called(ca...)
-	return args.Error(0)
+
+	var r0 map[string]struct{}
+	if args.Get(0) != nil {
+		var ok bool
+		r0, ok = args.Get(0).(map[string]struct{})
+		if !ok {
+			panic("args.Get(0) is not a map[string]struct{}")
+		}
+	}
+
+	return r0, args.Error(1)
 }
 
 // Close mocks the method
