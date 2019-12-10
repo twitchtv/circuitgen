@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/cep21/circuit v2.4.1+incompatible
+	github.com/cep21/circuit/v3 v3.1.0
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/kisielk/errcheck v1.2.0
 	github.com/securego/gosec v0.0.0-20190510081509-ee80733faf72

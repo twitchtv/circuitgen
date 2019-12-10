@@ -32,17 +32,19 @@ go get github.com/twitchtv/circuitgen
 # Usage
 
 ```bash
-circuitgen --pkg <package path> --name <type name> --out <output path> [--alias <alias>]
+circuitgen --pkg <package path> --name <type name> --out <output path> [--alias <alias>] [--circuit-major-version <circuit major version>]
 ```
 
 Add `./vendor/` to package path if the dependency is vendored.
+
+Set the `circuit-major-version` flag if using Go modules and major version 3 or later. This makes the wrappers import the same version as the rest of your code.
 
 ## Example
 
 Generating the DynamoDB client into the wrappers directory with circuits aliased as "DynamoDB"
 
 ```bash
-circuitgen --pkg github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface --name DynamoDBAPI --alias DynamoDB --out internal/wrappers
+circuitgen --pkg github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface --name DynamoDBAPI --alias DynamoDB --out internal/wrappers --circuit-major-version 3
 ```
 
 This generates a circuit wrapper that satifies the `github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface.DynamoDBAPI` interface.
@@ -58,7 +60,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
-	"github.com/cep21/circuit"
+	"github.com/cep21/circuit/v3"
 )
 
 // CircuitWrapperDynamoDBConfig contains configuration for CircuitWrapperDynamoDB. All fields are optional
