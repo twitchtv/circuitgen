@@ -13,6 +13,10 @@ import (
 
 // CircuitWrapperPublisherConfig contains configuration for CircuitWrapperPublisher. All fields are optional
 type CircuitWrapperPublisherConfig struct {
+	// ShouldSkipError determines whether an error should be skipped and have the circuit
+	// track the call as successful. This takes precedence over IsBadRequest
+	ShouldSkipError func(error) bool
+
 	// IsBadRequest is an optional bad request checker. It is useful to not count user errors as faults
 	IsBadRequest func(error) bool
 
@@ -32,6 +36,10 @@ type CircuitWrapperPublisherConfig struct {
 type CircuitWrapperPublisher struct {
 	circuitgentest.Publisher
 
+	// ShouldSkipError determines whether an error should be skipped and have the circuit
+	// track the call as successful. This takes precedence over IsBadRequest
+	ShouldSkipError func(error) bool
+
 	// IsBadRequest checks whether to count a user error against the circuit. It is recommended to set this
 	IsBadRequest func(error) bool
 
@@ -47,6 +55,12 @@ func NewCircuitWrapperPublisher(
 	embedded circuitgentest.Publisher,
 	conf CircuitWrapperPublisherConfig,
 ) (*CircuitWrapperPublisher, error) {
+	if conf.ShouldSkipError == nil {
+		conf.ShouldSkipError = func(err error) bool {
+			return false
+		}
+	}
+
 	if conf.IsBadRequest == nil {
 		conf.IsBadRequest = func(err error) bool {
 			return false
@@ -54,8 +68,9 @@ func NewCircuitWrapperPublisher(
 	}
 
 	w := &CircuitWrapperPublisher{
-		Publisher:    embedded,
-		IsBadRequest: conf.IsBadRequest,
+		Publisher:       embedded,
+		ShouldSkipError: conf.ShouldSkipError,
+		IsBadRequest:    conf.IsBadRequest,
 	}
 
 	var err error
@@ -76,15 +91,26 @@ func NewCircuitWrapperPublisher(
 // Publish calls the embedded circuitgentest.Publisher's method Publish with CircuitPublish
 func (w *CircuitWrapperPublisher) Publish(ctx context.Context, p1 map[circuitgentest.Seed][][]circuitgentest.Grant, p2 circuitgentest.TopicsList, p3 ...rep.PublishOption) (map[string]struct{}, error) {
 	var r0 map[string]struct{}
+	var skippedErr error
+
 	err := w.CircuitPublish.Run(ctx, func(ctx context.Context) error {
 		var err error
 		r0, err = w.Publisher.Publish(ctx, p1, p2, p3...)
+
+		if w.ShouldSkipError(err) {
+			skippedErr = err
+			return nil
+		}
 
 		if w.IsBadRequest(err) {
 			return &circuit.SimpleBadRequest{Err: err}
 		}
 		return err
 	})
+
+	if skippedErr != nil {
+		err = skippedErr
+	}
 
 	if berr, ok := err.(*circuit.SimpleBadRequest); ok {
 		err = berr.Err
@@ -96,15 +122,26 @@ func (w *CircuitWrapperPublisher) Publish(ctx context.Context, p1 map[circuitgen
 // PublishWithResult calls the embedded circuitgentest.Publisher's method PublishWithResult with CircuitPublishWithResult
 func (w *CircuitWrapperPublisher) PublishWithResult(ctx context.Context, p1 rep.PublishInput) (*model.Result, error) {
 	var r0 *model.Result
+	var skippedErr error
+
 	err := w.CircuitPublishWithResult.Run(ctx, func(ctx context.Context) error {
 		var err error
 		r0, err = w.Publisher.PublishWithResult(ctx, p1)
+
+		if w.ShouldSkipError(err) {
+			skippedErr = err
+			return nil
+		}
 
 		if w.IsBadRequest(err) {
 			return &circuit.SimpleBadRequest{Err: err}
 		}
 		return err
 	})
+
+	if skippedErr != nil {
+		err = skippedErr
+	}
 
 	if berr, ok := err.(*circuit.SimpleBadRequest); ok {
 		err = berr.Err

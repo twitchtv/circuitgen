@@ -49,7 +49,8 @@ func resolvePackagePath(path string) (string, error) {
 
 func loadPackages(pkgPaths ...string) ([]*packages.Package, error) {
 	conf := &packages.Config{
-		Mode: packages.LoadTypes,
+		Mode: packages.NeedTypes | packages.NeedTypesSizes | packages.NeedImports |
+			packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles,
 	}
 
 	pkgs, err := packages.Load(conf, pkgPaths...)
