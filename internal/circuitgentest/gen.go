@@ -19,4 +19,5 @@ package circuitgentest
 // Disable goimports to catch any import bugs
 
 //go:generate circuitgen circuit --goimports=true --pkg . --name Publisher --out ./publisher.gen.go
+//go:generate circuitgen circuit --goimports=false --pkg . --name Publisher --alias PublisherCircuitV3 --out ./publishercircuitv3.gen.go --circuit-major-version 3
 //go:generate circuitgen circuit --goimports=true --pkg . --name Aggregator --out ./

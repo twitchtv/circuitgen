@@ -39,7 +39,7 @@ package {{ .PackageName }}
 
 import (
 	"context"
-	"github.com/cep21/circuit"
+	"github.com/cep21/circuit{{ .VersionSuffix }}"
 	{{ range .TypeMetadata.Imports -}}
 		"{{ .Path }}"
 	{{ end -}}
@@ -143,9 +143,10 @@ var _ {{ .EmbeddedType }} = (*{{ .WrapperStructName}})(nil)
 `))
 
 type circuitWrapperTemplateContext struct {
-	PackageName  string
-	Alias        string
-	TypeMetadata TypeMetadata
+	PackageName   string
+	Alias         string
+	VersionSuffix string
+	TypeMetadata  TypeMetadata
 }
 
 // ex. "dynamodbiface.DynamoDBAPI"
@@ -169,12 +170,13 @@ func (t *circuitWrapperTemplateContext) IsInterface() bool {
 }
 
 type circuitCmd struct {
-	pkg       string
-	name      string
-	out       string
-	alias     string
-	debug     bool
-	goimports bool
+	pkg          string
+	name         string
+	out          string
+	alias        string
+	majorVersion int
+	debug        bool
+	goimports    bool
 }
 
 func (c *circuitCmd) Cobra() *cobra.Command {
@@ -201,6 +203,7 @@ func (c *circuitCmd) Cobra() *cobra.Command {
 	pf.StringVar(&c.alias, "alias", "", "(Optional) The name used for the generated wrapper in the struct, constructor, and default circuit prefix. Defaults to name")
 	pf.BoolVar(&c.debug, "debug", false, "Enable debug logging mode")
 	pf.BoolVar(&c.goimports, "goimports", true, "Enable goimports formatting. If false, uses gofmt")
+	pf.IntVar(&c.majorVersion, "circuit-major-version", 2, "(Optional) The version of cep21/circuit to import. Use 3 or greater for go module compatibility.")
 
 	return cmd
 }
@@ -271,9 +274,10 @@ func (c *circuitCmd) gen() error {
 	c.log("parseType took %v", time.Since(s))
 
 	templateCtx := circuitWrapperTemplateContext{
-		PackageName:  outPkgName,
-		TypeMetadata: typeMeta,
-		Alias:        c.alias,
+		PackageName:   outPkgName,
+		VersionSuffix: circuitVersionSuffix(c.majorVersion),
+		TypeMetadata:  typeMeta,
+		Alias:         c.alias,
 	}
 
 	s = time.Now()

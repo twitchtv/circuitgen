@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"go/types"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"golang.org/x/tools/go/packages" // latest loader that supports modules
@@ -285,4 +286,11 @@ func stripVendor(path string) string {
 	}
 
 	return path
+}
+
+func circuitVersionSuffix(majorVersion int) string {
+	if majorVersion < 3 {
+		return ""
+	}
+	return "/v" + strconv.Itoa(majorVersion)
 }
