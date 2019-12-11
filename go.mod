@@ -3,7 +3,6 @@ module github.com/twitchtv/circuitgen
 go 1.13
 
 require (
-	github.com/aws/aws-sdk-go v1.26.0
 	github.com/cep21/circuit v2.4.1+incompatible
 	github.com/cep21/circuit/v3 v3.1.0
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
