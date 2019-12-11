@@ -19,6 +19,6 @@ import (
 	_ "github.com/kisielk/errcheck"
 	_ "github.com/securego/gosec"
 	_ "golang.org/x/lint/golint"
-	_ "golang.org/x/tools"
-	_ "honnef.co/go/tools"
+	_ "golang.org/x/tools/cmd/goimports"
+	_ "honnef.co/go/tools/cmd/staticcheck"
 )

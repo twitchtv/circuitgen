@@ -1,6 +1,6 @@
 module github.com/twitchtv/circuitgen
 
-go 1.12
+go 1.13
 
 require (
 	github.com/cep21/circuit v2.4.1+incompatible
@@ -13,6 +13,6 @@ require (
 	github.com/stretchr/objx v0.1.1 // indirect
 	github.com/stretchr/testify v1.3.0
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
-	golang.org/x/tools v0.0.0-20190521203540-521d6ed310dd
-	honnef.co/go/tools v0.0.0-20190531162725-42df64e2171a // indirect
+	golang.org/x/tools v0.0.0-20191211222325-ac2db28e8130
+	honnef.co/go/tools v0.0.1-2019.2.3
 )
