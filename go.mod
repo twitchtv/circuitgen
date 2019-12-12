@@ -1,6 +1,6 @@
 module github.com/twitchtv/circuitgen
 
-go 1.13
+go 1.11
 
 require (
 	github.com/cep21/circuit v2.4.1+incompatible
