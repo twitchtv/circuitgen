@@ -7,7 +7,7 @@ by a circuit. These wrapper structs have no outside Go dependencies besides the 
 It's important to provide a `IsBadRequest` to [not count user errors](https://github.com/cep21/circuit#not-counting-user-error-as-a-fault) against the circuit. A bad request is not counted as a success or failure in the circuit, so it does not affect opening or closing the circuit.
 For example, a spike in HTTP 4xx errors (ex. Validation errors) should not open the circuit.
 
-An optional `ShouldSkipError` can be provided so that the call is counted as successful.
+An optional `ShouldSkipError` can be provided so that the call is counted as successful even if there is a non-nil error.
 For example, DynamoDB responses that return ConditionalCheckedFailException (CCFE) should be counted as successful requests. In the scenario where CCFE is counted as a bad request, if the client is getting CCFE a majority of the time, and the circuit opens (ex. spike of timeouts), then the circuit will prolong closing the circuit until the circuit happens to make a request that doesn't return CCFE.
 
 ## Method Wrapping Requirements
@@ -127,9 +127,9 @@ func NewCircuitWrapperDynamoDB(
 	}
 
 	w := &CircuitWrapperDynamoDB{
-		DynamoDBAPI:  embedded,
+		DynamoDBAPI:     embedded,
 		ShouldSkipError: conf.ShouldSkipError,
-		IsBadRequest: conf.IsBadRequest,
+		IsBadRequest:    conf.IsBadRequest,
 	}
 
 	var err error
@@ -164,8 +164,13 @@ func (w *CircuitWrapperDynamoDB) BatchGetItemPagesWithContext(ctx context.Contex
 		if w.IsBadRequest(err) {
 			return &circuit.SimpleBadRequest{Err: err}
 		}
+
 		return err
 	})
+
+	if skippedErr != nil {
+		err = skippedErr
+	}
 
 	if berr, ok := err.(*circuit.SimpleBadRequest); ok {
 		err = berr.Err
@@ -191,8 +196,13 @@ func (w *CircuitWrapperDynamoDB) BatchGetItemWithContext(ctx context.Context, p1
 		if w.IsBadRequest(err) {
 			return &circuit.SimpleBadRequest{Err: err}
 		}
+
 		return err
 	})
+
+  if skippedErr != nil {
+    err = skippedErr
+  }
 
 	if berr, ok := err.(*circuit.SimpleBadRequest); ok {
 		err = berr.Err

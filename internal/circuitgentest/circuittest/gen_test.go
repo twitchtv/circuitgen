@@ -130,7 +130,9 @@ func TestPublisherInterfaceErrors(t *testing.T) {
 	m.AssertExpectations(t)
 
 	// Check circuit called
+	assert.EqualValues(t, 0, publishCounter.success)
 	assert.EqualValues(t, 1, publishCounter.failure)
+	assert.EqualValues(t, 0, publishCounter.badRequest)
 }
 
 func TestPublisherInterfaceBadRequest(t *testing.T) {
@@ -162,7 +164,46 @@ func TestPublisherInterfaceBadRequest(t *testing.T) {
 	m.AssertExpectations(t)
 
 	// Check circuit called
+	assert.EqualValues(t, 0, publishCounter.success)
+	assert.EqualValues(t, 0, publishCounter.failure)
 	assert.EqualValues(t, 1, publishCounter.badRequest)
+}
+
+func TestPublisherInterfaceSkippedError(t *testing.T) {
+	manager := &circuit.Manager{}
+
+	skippedError := errors.New("skipped error")
+	m := &circuitgentest.MockPublisher{}
+	m.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, skippedError).Once()
+
+	publishCounter := &runMetricsCounter{}
+	publisher, err := NewCircuitWrapperPublisher(manager, m, CircuitWrapperPublisherConfig{
+		ShouldSkipError: func(err error) bool {
+			return err == skippedError
+		},
+		IsBadRequest: func(err error) bool {
+			return err == skippedError
+		},
+		CircuitPublish: circuit.Config{
+			Metrics: circuit.MetricsCollectors{
+				Run: []circuit.RunMetrics{publishCounter},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, publisher)
+
+	ctx := context.Background()
+	_, err = publisher.Publish(ctx, map[circuitgentest.Seed][][]circuitgentest.Grant{}, circuitgentest.TopicsList{})
+	require.Equal(t, skippedError, err)
+
+	// Check embedded called
+	m.AssertExpectations(t)
+
+	// Check circuit called
+	assert.EqualValues(t, 1, publishCounter.success)
+	assert.EqualValues(t, 0, publishCounter.failure)
+	assert.EqualValues(t, 0, publishCounter.badRequest)
 }
 
 // Thinner test of aliased wrapper.
