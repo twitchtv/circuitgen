@@ -214,8 +214,8 @@ func createWrappedClient() (dynamodbiface.DynamoDBAPI, error) {
 
 	// Create circuit wrapped client
 	wrappedClient, err := wrappers.NewCircuitWrapperDynamoDB(m, client, wrappers.CircuitWrapperDynamoDBConfig{
-    // Custom check to skip errors to not count against the circuit. For DynamoDB specifically, ConditionalCheckFailedException
-    // errors are considered successful requests
+		// Custom check to skip errors to not count against the circuit. For DynamoDB specifically, ConditionalCheckFailedException
+		// errors are considered successful requests
 		ShouldSkipError: func(err error) bool {
 			aerr, ok := err.(awserr.Error)
 			return ok && aerr.Code() == dynamodb.ErrCodeConditionalCheckFailedException
