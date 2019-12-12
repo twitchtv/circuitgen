@@ -151,6 +151,8 @@ func NewCircuitWrapperDynamoDB(
 
 // BatchGetItemPagesWithContext calls the embedded dynamodbiface.DynamoDBAPI's method BatchGetItemPagesWithContext with CircuitBatchGetItemPagesWithContext
 func (w *CircuitWrapperDynamoDB) BatchGetItemPagesWithContext(ctx context.Context, p1 *dynamodb.BatchGetItemInput, p2 func(*dynamodb.BatchGetItemOutput, bool) bool, p3 ...request.Option) error {
+	var skippedErr error
+
 	err := w.CircuitBatchGetItemPagesWithContext.Run(ctx, func(ctx context.Context) error {
 		err := w.DynamoDBAPI.BatchGetItemPagesWithContext(ctx, p1, p2, p3...)
 
@@ -175,6 +177,8 @@ func (w *CircuitWrapperDynamoDB) BatchGetItemPagesWithContext(ctx context.Contex
 // BatchGetItemWithContext calls the embedded dynamodbiface.DynamoDBAPI's method BatchGetItemWithContext with CircuitBatchGetItemWithContext
 func (w *CircuitWrapperDynamoDB) BatchGetItemWithContext(ctx context.Context, p1 *dynamodb.BatchGetItemInput, p2 ...request.Option) (*dynamodb.BatchGetItemOutput, error) {
 	var r0 *dynamodb.BatchGetItemOutput
+	var skippedErr error
+
 	err := w.CircuitBatchGetItemWithContext.Run(ctx, func(ctx context.Context) error {
 		var err error
 		r0, err = w.DynamoDBAPI.BatchGetItemWithContext(ctx, p1, p2...)
