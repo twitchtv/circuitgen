@@ -200,9 +200,9 @@ func (w *CircuitWrapperDynamoDB) BatchGetItemWithContext(ctx context.Context, p1
 		return err
 	})
 
-  if skippedErr != nil {
-    err = skippedErr
-  }
+	if skippedErr != nil {
+		err = skippedErr
+	}
 
 	if berr, ok := err.(*circuit.SimpleBadRequest); ok {
 		err = berr.Err
