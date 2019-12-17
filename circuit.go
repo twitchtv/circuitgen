@@ -47,6 +47,10 @@ import (
 
 // {{ .WrapperStructName }}Config contains configuration for {{ .WrapperStructName }}. All fields are optional
 type {{ .WrapperStructName }}Config struct {
+	// ShouldSkipError determines whether an error should be skipped and have the circuit
+	// track the call as successful. This takes precedence over IsBadRequest
+	ShouldSkipError func(error) bool
+
 	// IsBadRequest is an optional bad request checker. It is useful to not count user errors as faults
 	IsBadRequest func(error) bool
 
@@ -68,6 +72,10 @@ type {{ .WrapperStructName }}Config struct {
 type {{ .WrapperStructName }} struct {
 	{{ .EmbeddedType }}
 
+	// ShouldSkipError determines whether an error should be skipped and have the circuit
+	// track the call as successful. This takes precedence over IsBadRequest
+	ShouldSkipError func(error) bool
+
 	// IsBadRequest checks whether to count a user error against the circuit. It is recommended to set this
 	IsBadRequest func(error) bool
 
@@ -85,6 +93,12 @@ func New{{ .WrapperStructName }}(
 	embedded {{ .EmbeddedType }},
 	conf {{ .WrapperStructName }}Config,
 ) (*{{ .WrapperStructName }}, error) {
+	if conf.ShouldSkipError == nil {
+		conf.ShouldSkipError = func(err error) bool {
+			return false
+		}
+	}
+
 	if conf.IsBadRequest == nil {
 		conf.IsBadRequest = func(err error) bool {
 			return false
@@ -93,6 +107,7 @@ func New{{ .WrapperStructName }}(
 
 	w := &{{ .WrapperStructName }}{
 		{{ .EmbeddedName }}: embedded,
+		ShouldSkipError: conf.ShouldSkipError,
 		IsBadRequest: conf.IsBadRequest,
 	}
 
@@ -114,6 +129,7 @@ func New{{ .WrapperStructName }}(
 // {{ $meth.Name }} calls the embedded {{ $.EmbeddedType }}'s method {{ $meth.Name}} with Circuit{{ $meth.Name }}
 func (w *{{ $.WrapperStructName }}) {{ $meth.Name }}({{ $meth.ParamsSignature "ctx"}}) {{ $meth.ResultsSignature }} {
 	{{ $meth.ResultsClosureVariableDeclarations -}}
+	var skippedErr error
 
 	err := w.Circuit{{ $meth.Name }}.Run(ctx, func(ctx context.Context) error {
 		{{ if $meth.HasOneMethodResultVariable -}}
@@ -122,11 +138,21 @@ func (w *{{ $.WrapperStructName }}) {{ $meth.Name }}({{ $meth.ParamsSignature "c
 			var err error
 			{{ $meth.ResultsCircuitVariableAssignments }} = w.{{ $.EmbeddedName }}.{{ $meth.Name }}({{ $meth.CallSignatureWithClosure }})
 		{{ end }}
+
+		if w.ShouldSkipError(err) {
+			skippedErr = err
+			return nil
+		}
+
 		if w.IsBadRequest(err) {
 			return &circuit.SimpleBadRequest{Err: err}
 		}
 		return err
 	})
+
+	if skippedErr != nil {
+		err = skippedErr
+	}
 
 	if berr, ok := err.(*circuit.SimpleBadRequest); ok {
 		err = berr.Err

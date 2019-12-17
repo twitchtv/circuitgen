@@ -4,8 +4,11 @@ circuitgen generates a circuit wrapper around an interface or struct that encaps
 A wrapper struct matching the interface or struct method set is generated, and each method call that is context-aware and returning an error is wrapped
 by a circuit. These wrapper structs have no outside Go dependencies besides the interface or struct's dependencies.
 
-It's important to provide a `IsBadRequest` to [not count user errors](https://github.com/cep21/circuit#not-counting-user-error-as-a-fault) against the circuit.
-For example, a spike in HTTP 4xx errors (ex. DynamoDB ConditionalCheckedFailException) should not open the circuit.
+It's important to provide a `IsBadRequest` to [not count user errors](https://github.com/cep21/circuit#not-counting-user-error-as-a-fault) against the circuit. A bad request is not counted as a success or failure in the circuit, so it does not affect opening or closing the circuit.
+For example, a spike in HTTP 4xx errors (ex. Validation errors) should not open the circuit.
+
+An optional `ShouldSkipError` can be provided so that the call is counted as successful even if there is a non-nil error.
+For example, DynamoDB responses that return ConditionalCheckedFailException (CCFE) should be counted as successful requests. In the scenario where CCFE is counted as a bad request, if the client is getting CCFE a majority of the time, and the circuit opens (ex. spike of timeouts), then the circuit will prolong closing the circuit until the circuit happens to make a request that doesn't return CCFE.
 
 ## Method Wrapping Requirements
 
@@ -65,6 +68,10 @@ import (
 
 // CircuitWrapperDynamoDBConfig contains configuration for CircuitWrapperDynamoDB. All fields are optional
 type CircuitWrapperDynamoDBConfig struct {
+	// ShouldSkipError determines whether an error should be skipped and have the circuit
+	// track the call as successful. This takes precedence over IsBadRequest
+	ShouldSkipError func(error) bool
+
 	// IsBadRequest is an optional bad request checker. It is useful to not count user errors as faults
 	IsBadRequest func(error) bool
 
@@ -86,6 +93,10 @@ type CircuitWrapperDynamoDBConfig struct {
 type CircuitWrapperDynamoDB struct {
 	dynamodbiface.DynamoDBAPI
 
+	// ShouldSkipError determines whether an error should be skipped and have the circuit
+	// track the call as successful. This takes precedence over IsBadRequest
+	ShouldSkipError func(error) bool
+
 	// IsBadRequest checks whether to count a user error against the circuit. It is recommended to set this
 	IsBadRequest func(error) bool
 
@@ -103,6 +114,12 @@ func NewCircuitWrapperDynamoDB(
 	embedded dynamodbiface.DynamoDBAPI,
 	conf CircuitWrapperDynamoDBConfig,
 ) (*CircuitWrapperDynamoDB, error) {
+	if conf.ShouldSkipError == nil {
+		conf.ShouldSkipError = func(err error) bool {
+			return false
+		}
+	}
+
 	if conf.IsBadRequest == nil {
 		conf.IsBadRequest = func(err error) bool {
 			return false
@@ -110,8 +127,9 @@ func NewCircuitWrapperDynamoDB(
 	}
 
 	w := &CircuitWrapperDynamoDB{
-		DynamoDBAPI:  embedded,
-		IsBadRequest: conf.IsBadRequest,
+		DynamoDBAPI:     embedded,
+		ShouldSkipError: conf.ShouldSkipError,
+		IsBadRequest:    conf.IsBadRequest,
 	}
 
 	var err error
@@ -133,14 +151,26 @@ func NewCircuitWrapperDynamoDB(
 
 // BatchGetItemPagesWithContext calls the embedded dynamodbiface.DynamoDBAPI's method BatchGetItemPagesWithContext with CircuitBatchGetItemPagesWithContext
 func (w *CircuitWrapperDynamoDB) BatchGetItemPagesWithContext(ctx context.Context, p1 *dynamodb.BatchGetItemInput, p2 func(*dynamodb.BatchGetItemOutput, bool) bool, p3 ...request.Option) error {
+	var skippedErr error
+
 	err := w.CircuitBatchGetItemPagesWithContext.Run(ctx, func(ctx context.Context) error {
 		err := w.DynamoDBAPI.BatchGetItemPagesWithContext(ctx, p1, p2, p3...)
+
+		if w.ShouldSkipError(err) {
+			skippedErr = err
+			return nil
+		}
 
 		if w.IsBadRequest(err) {
 			return &circuit.SimpleBadRequest{Err: err}
 		}
+
 		return err
 	})
+
+	if skippedErr != nil {
+		err = skippedErr
+	}
 
 	if berr, ok := err.(*circuit.SimpleBadRequest); ok {
 		err = berr.Err
@@ -152,15 +182,27 @@ func (w *CircuitWrapperDynamoDB) BatchGetItemPagesWithContext(ctx context.Contex
 // BatchGetItemWithContext calls the embedded dynamodbiface.DynamoDBAPI's method BatchGetItemWithContext with CircuitBatchGetItemWithContext
 func (w *CircuitWrapperDynamoDB) BatchGetItemWithContext(ctx context.Context, p1 *dynamodb.BatchGetItemInput, p2 ...request.Option) (*dynamodb.BatchGetItemOutput, error) {
 	var r0 *dynamodb.BatchGetItemOutput
+	var skippedErr error
+
 	err := w.CircuitBatchGetItemWithContext.Run(ctx, func(ctx context.Context) error {
 		var err error
 		r0, err = w.DynamoDBAPI.BatchGetItemWithContext(ctx, p1, p2...)
 
+		if w.ShouldSkipError(err) {
+			skippedErr = err
+			return nil
+		}
+
 		if w.IsBadRequest(err) {
 			return &circuit.SimpleBadRequest{Err: err}
 		}
+
 		return err
 	})
+
+	if skippedErr != nil {
+		err = skippedErr
+	}
 
 	if berr, ok := err.(*circuit.SimpleBadRequest); ok {
 		err = berr.Err
@@ -186,6 +228,12 @@ func createWrappedClient() (dynamodbiface.DynamoDBAPI, error) {
 
 	// Create circuit wrapped client
 	wrappedClient, err := wrappers.NewCircuitWrapperDynamoDB(m, client, wrappers.CircuitWrapperDynamoDBConfig{
+		// Custom check to skip errors to not count against the circuit. For DynamoDB specifically, ConditionalCheckFailedException
+		// errors are considered successful requests
+		ShouldSkipError: func(err error) bool {
+			aerr, ok := err.(awserr.Error)
+			return ok && aerr.Code() == dynamodb.ErrCodeConditionalCheckFailedException
+		},
 		// Custom check for bad request. This is important to not count user errors as faults.
 		// See https://github.com/cep21/circuit#not-counting-user-error-as-a-fault
 		IsBadRequest: func(err error) bool {
