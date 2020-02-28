@@ -13,6 +13,6 @@ require (
 	github.com/stretchr/objx v0.1.1 // indirect
 	github.com/stretchr/testify v1.3.0
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
-	golang.org/x/tools v0.0.0-20191211222325-ac2db28e8130
+	golang.org/x/tools v0.0.0-20200130193611-71629799394e
 	honnef.co/go/tools v0.0.1-2019.2.3
 )
