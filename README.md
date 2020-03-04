@@ -38,7 +38,7 @@ go get github.com/twitchtv/circuitgen
 circuitgen --pkg <package path> --name <type name> --out <output path> [--alias <alias>] [--circuit-major-version <circuit major version>]
 ```
 
-Add `./vendor/` to package path if the dependency is vendored.
+Add `./vendor/` to package path if the dependency is vendored; when using Go modules this is unnecessary.
 
 Set the `circuit-major-version` flag if using Go modules and major version 3 or later. This makes the wrappers import the same version as the rest of your code.
 
