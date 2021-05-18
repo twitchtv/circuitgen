@@ -223,9 +223,7 @@ func (c *circuitCmd) Cobra() *cobra.Command {
 	pf.StringVar(&c.name, "name", "", "(Required) The name of the type (interface or struct) in the package path")
 	markFlagRequired(pf, "name")
 
-	pf.StringVar(&c.out, "out", "", "(Required) The output path. A default filename is given if the path looks like a directory. The path is lazily created (equivalent to mkdir -p)")
-	markFlagRequired(pf, "out")
-
+	pf.StringVar(&c.out, "out", "", "(Optional) The output path. A default filename is given if the path looks like a directory. The path is lazily created (equivalent to mkdir -p). If not set, prints to standard output.")
 	pf.StringVar(&c.alias, "alias", "", "(Optional) The name used for the generated wrapper in the struct, constructor, and default circuit prefix. Defaults to name")
 	pf.BoolVar(&c.debug, "debug", false, "Enable debug logging mode")
 	pf.BoolVar(&c.goimports, "goimports", true, "Enable goimports formatting. If false, uses gofmt")
@@ -247,7 +245,7 @@ func (c *circuitCmd) Execute() error {
 		c.alias = c.name
 	}
 
-	if !strings.HasSuffix(c.out, ".go") {
+	if c.out != "" && !strings.HasSuffix(c.out, ".go") {
 		c.out = filepath.Join(c.out, strings.ToLower(c.alias)+".gen.go")
 	}
 
@@ -341,7 +339,12 @@ func (c *circuitCmd) log(msg string, args ...interface{}) {
 }
 
 // Writes the src to the path. The directory is lazily created for the path (equivalent to `mkdir -p`)
+// If path is empty, writes to stdout.
 func writeFile(path string, src []byte) error {
+	if path == "" {
+		_, err := os.Stdout.Write(src)
+		return err
+	}
 	dir := filepath.Dir(path)
 	err := os.MkdirAll(dir, 0750)
 	if err != nil {
