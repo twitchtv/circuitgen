@@ -35,8 +35,10 @@ go get github.com/twitchtv/circuitgen
 # Usage
 
 ```bash
-circuitgen --pkg <package path> --name <type name> --out <output path> [--alias <alias>] [--circuit-major-version <circuit major version>]
+circuitgen --pkg <package path> --name <type name> [--out <output path>] [--alias <alias>] [--circuit-major-version <circuit major version>]
 ```
+
+If no `out` flag is included, the generated code is printed to standard output.
 
 Add `./vendor/` to package path if the dependency is vendored; when using Go modules this is unnecessary.
 
