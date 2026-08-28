@@ -183,6 +183,11 @@ func resolvePkgPaths(p types.Type) ([]string, error) {
 	case *types.Interface:
 	case *types.Struct: // struct{}
 		// Break out of the switch and return below
+	case *types.Alias:
+		if pkg := t.Obj().Pkg(); pkg != nil {
+			return []string{stripVendor(pkg.Path())}, nil
+		}
+		return resolvePkgPaths(t.Rhs())
 	default:
 		return nil, fmt.Errorf("resolvePkgPaths: invalid type: %v", t)
 	}
