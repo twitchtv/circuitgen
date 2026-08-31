@@ -197,7 +197,7 @@ func (t *circuitWrapperTemplateContext) IsInterface() bool {
 
 type circuitCmd struct {
 	pkg          string
-	name         string
+	name         []string
 	out          string
 	alias        string
 	majorVersion int
@@ -220,10 +220,10 @@ func (c *circuitCmd) Cobra() *cobra.Command {
 	pf.StringVar(&c.pkg, "pkg", "", "(Required) The path to the package. Add ./vendor if the dependency is vendored")
 	markFlagRequired(pf, "pkg")
 
-	pf.StringVar(&c.name, "name", "", "(Required) The name of the type (interface or struct) in the package path")
+	pf.StringSliceVar(&c.name, "name", []string{}, "(Required) The name of the type (interface or struct) in the package path")
 	markFlagRequired(pf, "name")
 
-	pf.StringVar(&c.out, "out", "", "(Required) The output path. A default filename is given if the path looks like a directory. The path is lazily created (equivalent to mkdir -p)")
+	pf.StringVar(&c.out, "out", "", "(Required) The output path. A default filename is given if the path looks like a directory. The path is lazily created (equivalent to mkdir -p). Must be a directory of passing multiple names")
 	markFlagRequired(pf, "out")
 
 	pf.StringVar(&c.alias, "alias", "", "(Optional) The name used for the generated wrapper in the struct, constructor, and default circuit prefix. Defaults to name")
@@ -243,12 +243,15 @@ func markFlagRequired(pf *pflag.FlagSet, name string) {
 }
 
 func (c *circuitCmd) Execute() error {
-	if c.alias == "" {
-		c.alias = c.name
-	}
-
-	if !strings.HasSuffix(c.out, ".go") {
-		c.out = filepath.Join(c.out, strings.ToLower(c.alias)+".gen.go")
+	if len(c.name) > 1 {
+		if c.alias != "" {
+			return errors.New("unable to use alias with multiple interface invocation")
+		}
+		if strings.HasSuffix(c.out, ".go") {
+			return errors.New("must specify directory as filename if generating multiple interfaces")
+		}
+	} else if c.alias == ""  && len(c.name) > 0 {
+		c.alias = c.name[0]
 	}
 
 	if err := c.gen(); err != nil {
@@ -273,62 +276,75 @@ func (c *circuitCmd) gen() error {
 
 	pkg := pkgs[0]
 
-	obj := pkg.Types.Scope().Lookup(c.name)
-	if obj == nil {
-		return errors.New("could not lookup name")
-	}
+	for _, name := range(c.name) {
+		alias := c.alias
+		if alias == "" {
+			alias = name
+		}
+		out := c.out
+		if !strings.HasSuffix(out, ".go") {
+			out = filepath.Join(out, strings.ToLower(alias)+".gen.go")
+		}
+		if len(c.name) > 1 {
+			c.log("generating %s as %s => %s", name, alias, out)
+		}
+		obj := pkg.Types.Scope().Lookup(name)
+		if obj == nil {
+			return errors.New("could not lookup name")
+		}
 
-	typ := obj.Type()
-	if typ == nil {
-		return errors.New("object is not a type")
-	}
+		typ := obj.Type()
+		if typ == nil {
+			return errors.New("object is not a type")
+		}
 
-	s = time.Now()
-	outPkgPath, err := resolvePackagePath(c.out)
-	if err != nil {
-		return err
-	}
-	c.log("resolvePackagePath took %v", time.Since(s))
+		s = time.Now()
+		outPkgPath, err := resolvePackagePath(out)
+		if err != nil {
+			return err
+		}
+		c.log("resolvePackagePath took %v", time.Since(s))
 
-	outPkgName := filepath.Base(outPkgPath)
+		outPkgName := filepath.Base(outPkgPath)
 
-	s = time.Now()
-	typeMeta, err := parseType(typ, outPkgPath)
-	if err != nil {
-		return err
-	}
-	c.log("parseType took %v", time.Since(s))
+		s = time.Now()
+		typeMeta, err := parseType(typ, outPkgPath)
+		if err != nil {
+			return err
+		}
+		c.log("parseType took %v", time.Since(s))
 
-	templateCtx := circuitWrapperTemplateContext{
-		PackageName:   outPkgName,
-		VersionSuffix: circuitVersionSuffix(c.majorVersion),
-		TypeMetadata:  typeMeta,
-		Alias:         c.alias,
-	}
+		templateCtx := circuitWrapperTemplateContext{
+			PackageName:   outPkgName,
+			VersionSuffix: circuitVersionSuffix(c.majorVersion),
+			TypeMetadata:  typeMeta,
+			Alias:         alias,
+		}
 
-	s = time.Now()
-	var b bytes.Buffer
-	err = circuitWrapperTemplate.Execute(&b, &templateCtx)
-	if err != nil {
-		return fmt.Errorf("rendering circuit wrapper: %v", err)
-	}
-	c.log("executing circuit wrapper template took %v", time.Since(s))
+		s = time.Now()
+		var b bytes.Buffer
+		err = circuitWrapperTemplate.Execute(&b, &templateCtx)
+		if err != nil {
+			return fmt.Errorf("rendering circuit wrapper: %v", err)
+		}
+		c.log("executing circuit wrapper template took %v", time.Since(s))
 
-	s = time.Now()
-	var src []byte
-	if c.goimports {
-		src, err = imports.Process("<gen>", b.Bytes(), nil)
-	} else {
-		src, err = format.Source(b.Bytes())
-	}
-	if err != nil {
-		return fmt.Errorf("formatting rendered circuit wrapper: %v", err)
-	}
-	c.log("formatting code took %v", time.Since(s))
+		s = time.Now()
+		var src []byte
+		if c.goimports {
+			src, err = imports.Process("<gen>", b.Bytes(), nil)
+		} else {
+			src, err = format.Source(b.Bytes())
+		}
+		if err != nil {
+			return fmt.Errorf("formatting rendered circuit wrapper: %v", err)
+		}
+		c.log("formatting code took %v", time.Since(s))
 
-	err = writeFile(c.out, src)
-	if err != nil {
-		return fmt.Errorf("writing circuit wrapper file: %v", err)
+		err = writeFile(out, src)
+		if err != nil {
+			return fmt.Errorf("writing circuit wrapper file: %v", err)
+		}
 	}
 
 	return nil

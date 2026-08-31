@@ -42,6 +42,9 @@ Add `./vendor/` to package path if the dependency is vendored; when using Go mod
 
 Set the `circuit-major-version` flag if using Go modules and major version 3 or later. This makes the wrappers import the same version as the rest of your code.
 
+Note you can also pass multiple --name, or multiple names separated by comma in order to generate multiple interfaces at once. Note that while doing this
+the --out parameter has to be a directory and you cannot use an alias.
+
 ## Example
 
 Generating the DynamoDB client into the wrappers directory with circuits aliased as "DynamoDB"
